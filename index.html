@@ -147,6 +147,46 @@ details.rules .rules-body b{color:var(--ink);}
 
 /* ---------- Board ---------- */
 .board-wrap{display:flex; flex-direction:column; align-items:center; gap:12px;}
+.board-stage{position:relative; width:100%; max-width:560px;}
+#measureOverlay{position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible;}
+.board-controls{display:flex; gap:10px; width:100%; max-width:560px;}
+.board-controls button{width:auto; flex:1; font-size:0.8rem; padding:8px 10px;}
+.score-strip{
+  font-family:var(--mono); font-size:0.74rem; color:var(--ink-soft);
+  background:rgba(31,58,92,0.06); border-radius:999px; padding:5px 14px;
+}
+.cell.hint::after{
+  content:''; position:absolute; inset:3px; border-radius:4px; background:transparent;
+  border:2px solid var(--good); box-shadow:0 0 0 3px rgba(63,107,74,0.18);
+  animation:hintPulse 1s ease-in-out infinite;
+}
+@keyframes hintPulse{0%,100%{opacity:.5;} 50%{opacity:1;}}
+@keyframes stonePop{
+  0%{ transform:scale(0.2); opacity:0; }
+  60%{ transform:scale(1.12); opacity:1; }
+  100%{ transform:scale(1); opacity:1; }
+}
+.stone.latest{animation:stonePop .32s ease-out;}
+.measure-line{stroke:var(--copper); stroke-width:2; stroke-dasharray:4 3; opacity:0;}
+.measure-line.show{opacity:0.9; transition:opacity .15s ease;}
+.measure-label{
+  font-family:var(--mono); font-size:11px; fill:var(--copper-strong); font-weight:600;
+  opacity:0; transition:opacity .2s ease .25s;
+}
+.measure-label.show{opacity:1;}
+@keyframes confettiFall{
+  0%{ transform:translateY(-10px) rotate(0deg); opacity:1; }
+  100%{ transform:translateY(105vh) rotate(360deg); opacity:0; }
+}
+.confetti-piece{
+  position:fixed; top:0; width:8px; height:12px; z-index:999; pointer-events:none;
+  animation-name:confettiFall; animation-timing-function:ease-in;
+}
+@media (prefers-reduced-motion:reduce){
+  .stone.latest{animation:none;}
+  .cell.hint::after{animation:none;}
+  .confetti-piece{display:none;}
+}
 .status-bar{
   width:100%; text-align:center; padding:10px 14px; border-radius:8px;
   background:var(--navy); color:var(--paper); font-family:var(--mono); font-size:0.86rem;
@@ -176,6 +216,19 @@ details.rules .rules-body b{color:var(--ink);}
 }
 .cell.disabled{cursor:default;}
 .cell.disabled:hover::after{display:none;}
+.cell.not-legal{opacity:0.32; cursor:not-allowed;}
+.cell.not-legal:hover::after{display:none;}
+.cell.trap-any::after{
+  content:''; position:absolute; inset:2px; border-radius:3px; background:rgba(162,59,59,0.10);
+}
+@keyframes shakeCell{
+  0%,100%{transform:translateX(0);}
+  20%{transform:translateX(-4px);}
+  40%{transform:translateX(4px);}
+  60%{transform:translateX(-3px);}
+  80%{transform:translateX(3px);}
+}
+.cell.shake{animation:shakeCell .28s ease;}
 .stone{
   width:78%; height:78%; border-radius:50%; position:relative;
   box-shadow:0 1px 2px rgba(0,0,0,0.35), inset 0 -2px 3px rgba(0,0,0,0.25), inset 0 2px 2px rgba(255,255,255,0.25);
@@ -246,7 +299,10 @@ footer{text-align:center; font-family:var(--mono); font-size:0.72rem; color:var(
     <h1>Golomb<span class="tick">·</span></h1>
     <span class="tagline">a distance game, played on graph paper</span>
   </div>
-  <button class="install-btn" id="installBtn">⬇ Install app</button>
+  <div style="display:flex; align-items:center; gap:8px;">
+    <button class="install-btn" id="soundBtn" style="display:inline-flex;">🔊 Sound</button>
+    <button class="install-btn" id="installBtn">⬇ Install app</button>
+  </div>
 </div>
 
 <div class="layout">
@@ -273,11 +329,11 @@ footer{text-align:center; font-family:var(--mono); font-size:0.72rem; color:var(
         </div>
         <div class="field" data-color="black" data-role="strategy-field" style="display:none;">
           <select data-color="black" data-role="strategy">
-            <option value="random">Random</option>
-            <option value="best">Best strategy</option>
-            <option value="worst">Worst strategy</option>
-            <option value="lowestAvg">Lowest avg. distance</option>
-            <option value="highestAvg">Highest avg. distance</option>
+            <option value="highestAvg">Highest avg. distance — Easy</option>
+            <option value="random">Random — Easy</option>
+            <option value="worst">Worst strategy — Medium</option>
+            <option value="lowestAvg">Lowest avg. distance — Hard</option>
+            <option value="best" selected>Best strategy — Expert</option>
           </select>
         </div>
       </div>
@@ -290,12 +346,20 @@ footer{text-align:center; font-family:var(--mono); font-size:0.72rem; color:var(
         </div>
         <div class="field" data-color="white" data-role="strategy-field" style="display:none;">
           <select data-color="white" data-role="strategy">
-            <option value="random">Random</option>
-            <option value="best">Best strategy</option>
-            <option value="worst">Worst strategy</option>
-            <option value="lowestAvg">Lowest avg. distance</option>
-            <option value="highestAvg">Highest avg. distance</option>
+            <option value="highestAvg">Highest avg. distance — Easy</option>
+            <option value="random">Random — Easy</option>
+            <option value="worst">Worst strategy — Medium</option>
+            <option value="lowestAvg">Lowest avg. distance — Hard</option>
+            <option value="best" selected>Best strategy — Expert</option>
           </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>If forced into a trap (no legal cell anywhere), the trapped player:</label>
+        <div class="seg" id="forcedRuleSeg">
+          <button data-val="lose" class="active">Loses <span style="opacity:.7">(recommended)</span></button>
+          <button data-val="win">Wins</button>
         </div>
       </div>
 
@@ -304,11 +368,14 @@ footer{text-align:center; font-family:var(--mono); font-size:0.72rem; color:var(
       <details class="rules">
         <summary>Rules &amp; how the bots think</summary>
         <div class="rules-body">
-          <p><b>Placing.</b> Players alternate placing a stone of their own color on any empty cell. Black moves first.</p>
-          <p><b>Pairing.</b> After a placement, the <i>other</i> player must pick one existing stone of that same color and pair it with the new stone. The squared distance between them gets marked "used" for that color.</p>
-          <p><b>The catch.</b> A color may never reuse a distance. If every existing stone of that color would force a repeat, the chooser has no legal pick — and the player who just placed <b>wins instantly</b>.</p>
-          <p><b>Draws.</b> If the board fills up with no one ever getting stuck, it's a draw.</p>
-          <p><b>Bot strategies.</b> <i>Best/Worst</i> use a 1-ply lookahead: when placing, Best picks the cell that leaves its opponent the fewest legal pairings (cornering them); Worst does the opposite. When choosing, Best/Worst use the board's global distance-frequency table to spend common vs. rare distances. These are strong heuristics, not a solved-game optimum — the full game tree is enormous. <i>Lowest/Highest avg. distance</i> place on the cell whose average distance to all stones on the board is smallest/largest.</p>
+          <p><b>Placing.</b> Players alternate placing a stone of their own color. Black moves first. A placement is only legal if the new stone has at least one non-repeat distance to an existing same-color stone — you can't voluntarily set up a repeat.</p>
+          <p><b>Pairing.</b> Once placed, the <i>other</i> player picks one existing same-color stone to pair it with (when more than one legal option exists). That distance gets marked "used" for that color, forever.</p>
+          <p><b>The trap.</b> If every empty cell on the board would force a repeat for the player to move, they're trapped — there's no legal square left. By default the trapped player <b>loses</b> (the standard "no legal move" convention); flip the house rule above if you'd rather reward being cornered.</p>
+          <p><b>Draws.</b> If the board fills up completely with only legal placements, it's a draw — rare, since traps usually end the game well before that.</p>
+          <p><b>Bot strategies, weakest to strongest:</b> Highest avg. distance → Random → Worst strategy → Lowest avg. distance → Best strategy, measured over thousands of simulated games.</p>
+          <p><b>Why clustering is strong.</b> Short distances near a cluster come from a tiny palette (1, 2, 4, 5, 8…), so packing stones together burns through that palette fast — which is what tends to trap the <i>opponent's</i> next placement first.</p>
+          <p><b>Best strategy</b> combines that with a 1-ply lookahead: it picks the placement that leaves the opponent the fewest legal squares next turn, and among ties, prefers the tightest cluster. Worst does the opposite on purpose.</p>
+          <p><b>On balance.</b> With the "trapped player loses" house rule and two Best-strategy bots, a 16×16 board comes out to roughly 51%/49% — about as fair as this game gets between the two colors.</p>
         </div>
       </details>
     </div>
@@ -317,7 +384,15 @@ footer{text-align:center; font-family:var(--mono); font-size:0.72rem; color:var(
   <!-- Board -->
   <div class="board-wrap">
     <div class="status-bar" id="statusBar">Set your players and press Start.</div>
-    <div id="board"></div>
+    <div class="board-stage">
+      <div id="board"></div>
+      <svg id="measureOverlay"></svg>
+    </div>
+    <div class="board-controls">
+      <button class="secondary" id="hintBtn">💡 Hint</button>
+      <button class="secondary" id="swapBtn">🔁 Swap sides &amp; restart</button>
+    </div>
+    <div class="score-strip" id="scoreStrip">Session — Black 0 · White 0 · Draws 0</div>
   </div>
 
   <!-- Ledger -->
@@ -340,6 +415,7 @@ footer{text-align:center; font-family:var(--mono); font-size:0.72rem; color:var(
 <div class="batch-panel panel">
   <p class="eyebrow">Bot laboratory</p>
   <h2>Bot vs. bot — run many games</h2>
+  <p style="font-size:0.78rem; color:var(--ink-soft); margin-top:-6px;">Uses the same "forced into a trap" house rule set above.</p>
   <div class="batch-grid">
     <div class="field">
       <label for="batchSize">Board size</label>
@@ -351,21 +427,21 @@ footer{text-align:center; font-family:var(--mono); font-size:0.72rem; color:var(
     <div class="field">
       <label for="batchBlack">Black strategy</label>
       <select id="batchBlack">
-        <option value="random">Random</option>
-        <option value="best" selected>Best strategy</option>
-        <option value="worst">Worst strategy</option>
-        <option value="lowestAvg">Lowest avg. distance</option>
-        <option value="highestAvg">Highest avg. distance</option>
+        <option value="highestAvg">Highest avg. distance — Easy</option>
+        <option value="random">Random — Easy</option>
+        <option value="worst">Worst strategy — Medium</option>
+        <option value="lowestAvg">Lowest avg. distance — Hard</option>
+        <option value="best" selected>Best strategy — Expert</option>
       </select>
     </div>
     <div class="field">
       <label for="batchWhite">White strategy</label>
       <select id="batchWhite">
-        <option value="random" selected>Random</option>
-        <option value="best">Best strategy</option>
-        <option value="worst">Worst strategy</option>
-        <option value="lowestAvg">Lowest avg. distance</option>
-        <option value="highestAvg">Highest avg. distance</option>
+        <option value="highestAvg">Highest avg. distance — Easy</option>
+        <option value="random" selected>Random — Easy</option>
+        <option value="worst">Worst strategy — Medium</option>
+        <option value="lowestAvg">Lowest avg. distance — Hard</option>
+        <option value="best">Best strategy — Expert</option>
       </select>
     </div>
     <div class="field">
@@ -420,7 +496,7 @@ function makeFreqTable(size){
   }
   return freq;
 }
-function newGame(size, freq){
+function newGame(size, freq, forcedLoses){
   return {
     size,
     stones: [],
@@ -432,6 +508,7 @@ function newGame(size, freq){
     log: [],
     freq: freq || makeFreqTable(size),
     nextId: 0,
+    forcedLoses: forcedLoses !== false, // default: being forced into a trap = you lose
   };
 }
 function cellOccupied(state,x,y){ return state.stones.some(s=>s.x===x&&s.y===y); }
@@ -448,6 +525,14 @@ function legalPairings(state,color,newStone){
   const others = sameColorStones(state,color,newStone.id);
   return others.filter(s=> !state.used[color].has(sqDist(newStone,s)) );
 }
+// Cells where `color` may legally place right now: the new stone must have >=1 non-repeat
+// distance to an existing same-color stone, or fewer than 2 such stones exist yet (trivially safe).
+function legalPlacementCells(state,color){
+  const empties = emptyCells(state);
+  const others = sameColorStones(state,color);
+  if(others.length < 2) return empties;
+  return empties.filter(c => others.some(s=> !state.used[color].has(sqDist(c,s))) );
+}
 function passTurn(state){
   state.turn = state.turn==='black' ? 'white' : 'black';
   if(state.phase==='placing' && emptyCells(state).length===0){
@@ -458,6 +543,11 @@ function placeStone(state,x,y){
   if(state.phase!=='placing') return {error:'not-placing'};
   if(cellOccupied(state,x,y)) return {error:'occupied'};
   const color = state.turn;
+  const legalCells = legalPlacementCells(state,color);
+  const forced = legalCells.length===0; // no legal cell anywhere -> must play a trap cell
+  if(!forced && !legalCells.some(c=>c.x===x&&c.y===y)){
+    return {error:'illegal-move'};
+  }
   const id = state.nextId++;
   const stone = {x,y,color,id};
   state.stones.push(stone);
@@ -467,15 +557,17 @@ function placeStone(state,x,y){
     passTurn(state);
     return {status:'placed-no-pairing'};
   }
-  const legal = legalPairings(state,color,stone);
-  if(legal.length===0){
-    state.phase='over'; state.winner=color;
-    state.log.push({idx:state.log.length,color,x,y,pairedWith:null,distance:null,note:'opponent-stuck'});
-    return {status:'win',winner:color};
+  const legalPairs = legalPairings(state,color,stone);
+  if(legalPairs.length===0){
+    // forced trap: no cell on the whole board would have worked. Game ends now.
+    state.phase='over';
+    state.winner = state.forcedLoses ? (color==='black'?'white':'black') : color;
+    state.log.push({idx:state.log.length,color,x,y,pairedWith:null,distance:null,note:'forced-trap'});
+    return {status:'forced-end', winner: state.winner};
   }
   state.phase='choosing';
   state.pending=stone.id;
-  return {status:'awaiting-choice', legalOptions:legal};
+  return {status:'awaiting-choice', legalOptions:legalPairs};
 }
 function chooseStone(state,chosenId){
   if(state.phase!=='choosing') return {error:'not-choosing'};
@@ -493,12 +585,14 @@ function chooseStone(state,chosenId){
 }
 function randInt(n){ return Math.floor(Math.random()*n); }
 function botPlacement(state,color,strategy){
-  const empties = emptyCells(state);
-  if(empties.length===0) return null;
-  if(strategy==='random') return empties[randInt(empties.length)];
+  const legalCells = legalPlacementCells(state,color);
+  const candidates = legalCells.length>0 ? legalCells : emptyCells(state); // forced: any cell left
+  if(candidates.length===0) return null;
+  if(legalCells.length===0) return candidates[randInt(candidates.length)]; // forced, all equally trap-y
+  if(strategy==='random') return candidates[randInt(candidates.length)];
   if(strategy==='lowestAvg' || strategy==='highestAvg'){
-    if(state.stones.length===0) return empties[randInt(empties.length)];
-    let scored = empties.map(c=>{
+    if(state.stones.length===0) return candidates[randInt(candidates.length)];
+    let scored = candidates.map(c=>{
       const total = state.stones.reduce((sum,s)=>sum+Math.sqrt(sqDist(c,s)),0);
       return {c, avg: total/state.stones.length};
     });
@@ -509,17 +603,25 @@ function botPlacement(state,color,strategy){
   }
   if(strategy==='best' || strategy==='worst'){
     const others = sameColorStones(state,color);
-    if(others.length===0) return empties[randInt(empties.length)];
-    let scored = empties.map(c=>{
+    if(others.length===0) return candidates[randInt(candidates.length)];
+    // primary: how many legal pairings this leaves the opponent (corner them / free them)
+    // tiebreak: cluster tightly toward own stones. Clustering burns through the small palette
+    // of short distances fastest, which is what eventually corners the opponent.
+    let scored = candidates.map(c=>{
       const legalCount = others.filter(s=> !state.used[color].has(sqDist(c,s)) ).length;
-      return {c, legalCount};
+      const clusterAvg = others.reduce((sum,s)=>sum+Math.sqrt(sqDist(c,s)),0)/others.length;
+      return {c, legalCount, clusterAvg};
     });
-    scored.sort((a,b)=> strategy==='best'? a.legalCount-b.legalCount : b.legalCount-a.legalCount);
-    const bestVal = scored[0].legalCount;
-    const bestCells = scored.filter(s=>s.legalCount===bestVal);
-    return bestCells[randInt(bestCells.length)].c;
+    if(strategy==='best'){
+      scored.sort((a,b)=> a.legalCount-b.legalCount || a.clusterAvg-b.clusterAvg);
+    } else {
+      scored.sort((a,b)=> b.legalCount-a.legalCount || b.clusterAvg-a.clusterAvg);
+    }
+    const top = scored[0];
+    const tiedPool = scored.filter(s=> s.legalCount===top.legalCount && Math.abs(s.clusterAvg-top.clusterAvg)<1e-9);
+    return tiedPool[randInt(tiedPool.length)].c;
   }
-  return empties[randInt(empties.length)];
+  return candidates[randInt(candidates.length)];
 }
 function botChoice(state,color,newStone,legalOptions,strategy){
   if(strategy==='random') return legalOptions[randInt(legalOptions.length)].id;
@@ -571,6 +673,14 @@ let players = {
   white:{type:'human', strategy:'best'},
 };
 let interactive = true;
+let forcedLosesRule = true;
+
+document.getElementById('forcedRuleSeg').addEventListener('click', e=>{
+  const btn = e.target.closest('button'); if(!btn) return;
+  document.querySelectorAll('#forcedRuleSeg button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  forcedLosesRule = (btn.dataset.val==='lose');
+});
 
 const boardEl = document.getElementById('board');
 const statusBar = document.getElementById('statusBar');
@@ -579,8 +689,112 @@ const usedBlackEl = document.getElementById('usedBlack');
 const usedWhiteEl = document.getElementById('usedWhite');
 const sizeRange = document.getElementById('sizeRange');
 const sizeOut = document.getElementById('sizeOut');
+const measureOverlay = document.getElementById('measureOverlay');
+const scoreStripEl = document.getElementById('scoreStrip');
 
 sizeRange.addEventListener('input', ()=> sizeOut.textContent = sizeRange.value+'×'+sizeRange.value);
+
+/* ---------- Sound (WebAudio, no assets) ---------- */
+let audioCtx = null;
+let soundOn = (localStorage.getItem('golomb-sound') !== 'off');
+function updateSoundBtn(){
+  document.getElementById('soundBtn').textContent = soundOn ? '🔊 Sound' : '🔇 Muted';
+}
+updateSoundBtn();
+document.getElementById('soundBtn').addEventListener('click', ()=>{
+  soundOn = !soundOn;
+  localStorage.setItem('golomb-sound', soundOn ? 'on' : 'off');
+  updateSoundBtn();
+});
+function tone(freq, start, dur, type, gainPeak){
+  if(!soundOn) return;
+  try{
+    if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    const t0 = audioCtx.currentTime + start;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type||'sine';
+    osc.frequency.setValueAtTime(freq, t0);
+    gain.gain.setValueAtTime(0, t0);
+    gain.gain.linearRampToValueAtTime(gainPeak||0.12, t0+0.015);
+    gain.gain.exponentialRampToValueAtTime(0.001, t0+dur);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t0); osc.stop(t0+dur+0.02);
+  }catch(e){ /* audio unavailable, fail silently */ }
+}
+function sfxPlace(){ tone(520,0,0.09,'triangle'); }
+function sfxChoose(){ tone(340,0,0.07,'square',0.06); tone(680,0.05,0.09,'sine',0.08); }
+function sfxWin(){ [523,659,784,1047].forEach((f,i)=> tone(f, i*0.09, 0.22, 'triangle', 0.1)); }
+function sfxStuck(){ tone(220,0,0.05,'sawtooth',0.08); tone(160,0.06,0.28,'sawtooth',0.09); }
+function sfxDraw(){ tone(300,0,0.18,'sine',0.07); }
+
+/* ---------- Session score (persisted) ---------- */
+let sessionScore = {black:0, white:0, draw:0};
+try{ sessionScore = JSON.parse(localStorage.getItem('golomb-score')) || sessionScore; }catch(e){}
+function renderScoreStrip(){
+  scoreStripEl.textContent = 'Session — Black '+sessionScore.black+' · White '+sessionScore.white+' · Draws '+sessionScore.draw;
+}
+renderScoreStrip();
+function recordResult(winner){
+  if(winner==='black') sessionScore.black++;
+  else if(winner==='white') sessionScore.white++;
+  else sessionScore.draw++;
+  localStorage.setItem('golomb-score', JSON.stringify(sessionScore));
+  renderScoreStrip();
+}
+
+/* ---------- Confetti ---------- */
+function burstConfetti(){
+  if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const colors = ['#B5652E','#1F3A5C','#20242B','#e9e2d0','#3f6b4a'];
+  for(let i=0;i<36;i++){
+    const el = document.createElement('div');
+    el.className='confetti-piece';
+    el.style.left = (Math.random()*100)+'vw';
+    el.style.background = colors[i%colors.length];
+    el.style.animationDuration = (1.4+Math.random()*1.1)+'s';
+    el.style.animationDelay = (Math.random()*0.25)+'s';
+    el.style.transform = 'rotate('+(Math.random()*360)+'deg)';
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(), 3000);
+  }
+}
+
+/* ---------- Hint ---------- */
+let currentHint = null;
+document.getElementById('hintBtn').addEventListener('click', ()=>{
+  if(!game || game.phase==='over' || !interactive) return;
+  const actor = currentActorColor();
+  if(players[actor].type!=='human') return;
+  if(game.phase==='placing'){
+    const cell = botPlacement(game, game.turn, 'best');
+    currentHint = {mode:'place', x:cell.x, y:cell.y};
+  } else {
+    const ns = game.stones.find(s=>s.id===game.pending);
+    const legal = legalPairings(game, ns.color, ns);
+    const id = botChoice(game, ns.color, ns, legal, 'best');
+    const target = game.stones.find(s=>s.id===id);
+    currentHint = {mode:'choose', x:target.x, y:target.y};
+  }
+  renderBoard();
+  setTimeout(()=>{ currentHint=null; renderBoard(); }, 3500);
+});
+
+/* ---------- Swap sides ---------- */
+document.getElementById('swapBtn').addEventListener('click', ()=>{
+  const tmp = players.black; players.black = players.white; players.white = tmp;
+  syncPlayerControls();
+  startNewGame();
+});
+function syncPlayerControls(){
+  ['black','white'].forEach(color=>{
+    const seg = document.querySelector('.seg[data-color="'+color+'"][data-role="type"]');
+    seg.querySelectorAll('button').forEach(b=> b.classList.toggle('active', b.dataset.val===players[color].type));
+    document.querySelector('.field[data-color="'+color+'"][data-role="strategy-field"]').style.display =
+      players[color].type==='bot' ? 'block' : 'none';
+    document.querySelector('select[data-color="'+color+'"][data-role="strategy"]').value = players[color].strategy;
+  });
+}
 
 document.querySelectorAll('.seg[data-role="type"]').forEach(seg=>{
   seg.addEventListener('click', e=>{
@@ -601,8 +815,10 @@ document.getElementById('newGameBtn').addEventListener('click', startNewGame);
 
 function startNewGame(){
   const size = parseInt(sizeRange.value,10);
-  game = newGame(size);
+  game = newGame(size, null, forcedLosesRule);
   interactive = true;
+  currentHint = null;
+  measureOverlay.innerHTML = '';
   renderAll();
   maybeBotMove();
 }
@@ -645,14 +861,67 @@ function maybeBotMove(){
 }
 
 function doPlace(x,y){
+  currentHint = null;
   const res = placeStone(game,x,y);
+  if(res.error){
+    if(res.error==='illegal-move') shakeCell(x,y);
+    return;
+  }
+  sfxPlace();
   renderAll();
-  if(res.status!=='error') maybeBotMove();
+  handleGameOverEffects();
+  maybeBotMove();
 }
 function doChoose(id){
+  currentHint = null;
   const res = chooseStone(game,id);
+  if(res.error) return;
+  sfxChoose();
   renderAll();
-  if(res.status!=='error') maybeBotMove();
+  const entry = game.log[game.log.length-1];
+  if(entry && entry.pairedWith){
+    drawMeasureLine({x:entry.x,y:entry.y}, entry.pairedWith, Math.sqrt(entry.distance).toFixed(2));
+  }
+  handleGameOverEffects();
+  maybeBotMove();
+}
+function handleGameOverEffects(){
+  if(game.phase==='over' && !game._scored){
+    game._scored = true;
+    recordResult(game.winner);
+    if(game.winner==='draw'){ sfxDraw(); }
+    else { sfxStuck(); setTimeout(sfxWin, 260); burstConfetti(); }
+  }
+}
+function drawMeasureLine(fromXY, toXY, label){
+  const c1 = boardEl.querySelector('.cell[data-x="'+fromXY.x+'"][data-y="'+fromXY.y+'"]');
+  const c2 = boardEl.querySelector('.cell[data-x="'+toXY.x+'"][data-y="'+toXY.y+'"]');
+  if(!c1 || !c2) return;
+  const stageRect = measureOverlay.getBoundingClientRect();
+  const r1 = c1.getBoundingClientRect(), r2 = c2.getBoundingClientRect();
+  const x1=r1.left+r1.width/2-stageRect.left, y1=r1.top+r1.height/2-stageRect.top;
+  const x2=r2.left+r2.width/2-stageRect.left, y2=r2.top+r2.height/2-stageRect.top;
+  measureOverlay.innerHTML = '';
+  const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+  line.setAttribute('x1',x1); line.setAttribute('y1',y1); line.setAttribute('x2',x2); line.setAttribute('y2',y2);
+  line.setAttribute('class','measure-line');
+  measureOverlay.appendChild(line);
+  const text = document.createElementNS('http://www.w3.org/2000/svg','text');
+  text.setAttribute('x', (x1+x2)/2 + 6);
+  text.setAttribute('y', (y1+y2)/2 - 6);
+  text.setAttribute('class','measure-label');
+  text.textContent = 'd = '+label;
+  measureOverlay.appendChild(text);
+  requestAnimationFrame(()=>{ line.classList.add('show'); text.classList.add('show'); });
+  setTimeout(()=>{ line.classList.remove('show'); text.classList.remove('show'); }, 1300);
+  setTimeout(()=>{ if(measureOverlay.contains(line)) measureOverlay.removeChild(line); if(measureOverlay.contains(text)) measureOverlay.removeChild(text); }, 1750);
+}
+
+function shakeCell(x,y){
+  const c = boardEl.querySelector('.cell[data-x="'+x+'"][data-y="'+y+'"]');
+  if(!c) return;
+  c.classList.add('shake');
+  setTimeout(()=>c.classList.remove('shake'), 320);
 }
 
 function onCellClick(e){
@@ -699,12 +968,24 @@ function renderBoard(){
   const lastLog = game.log[game.log.length-1];
   const latestKey = lastLog ? lastLog.x+','+lastLog.y : null;
 
+  let placeLegalSet = null, placingIsTrap = false;
+  if(game.phase==='placing' && interactive && players[game.turn].type==='human'){
+    const cells = legalPlacementCells(game, game.turn);
+    placingIsTrap = cells.length===0;
+    placeLegalSet = new Set(cells.map(c=>c.x+','+c.y));
+  }
+
   for(let y=0;y<n;y++){
     const rowLbl=document.createElement('div'); rowLbl.className='ruler-label'; rowLbl.textContent=y;
     boardEl.appendChild(rowLbl);
     for(let x=0;x<n;x++){
       const cell=document.createElement('div');
       cell.className='cell'+(!interactive?' disabled':'');
+      if(currentHint && currentHint.x===x && currentHint.y===y) cell.classList.add('hint');
+      if(placeLegalSet && !cellOccupied(game,x,y)){
+        if(placingIsTrap) cell.classList.add('trap-any');
+        else if(!placeLegalSet.has(x+','+y)) cell.classList.add('not-legal');
+      }
       cell.dataset.x=x; cell.dataset.y=y;
       const stone = game.stones.find(s=>s.x===x&&s.y===y);
       if(stone){
@@ -732,11 +1013,19 @@ function renderStatus(){
   if(game.phase==='over'){
     if(game.winner==='draw'){
       statusBar.classList.add('draw');
-      statusBar.textContent = 'Draw — the board filled up with no one stuck.';
+      statusBar.textContent = 'Draw — the board filled up with only legal placements.';
     } else {
       statusBar.classList.add('win');
+      const lastEntry = game.log[game.log.length-1];
+      const trapped = lastEntry && lastEntry.note==='forced-trap' ? lastEntry.color : null;
       const other = game.winner==='black'?'white':'black';
-      statusBar.innerHTML = '<span class="who">'+colorLabel(game.winner,true)+' wins!</span> '+colorLabel(other,true)+' had no legal distance left to choose.';
+      if(trapped){
+        const verb = game.forcedLoses ? 'lost' : 'won';
+        statusBar.innerHTML = '<span class="who">'+colorLabel(trapped,true)+'</span> was trapped — no legal cell left — and '+verb+'. '+
+          (game.forcedLoses ? colorLabel(game.winner,true)+' wins!' : '');
+      } else {
+        statusBar.innerHTML = '<span class="who">'+colorLabel(game.winner,true)+' wins!</span>';
+      }
     }
     return;
   }
@@ -758,8 +1047,9 @@ function renderLedger(){
   ledgerList.innerHTML = game.log.map(entry=>{
     const num = entry.idx+1;
     let detail;
-    if(entry.note==='opponent-stuck'){
-      detail = '<span class="win-row">'+entry.color+' @ ('+entry.x+','+entry.y+') — opponent had no legal pairing. Game over.</span>';
+    if(entry.note==='forced-trap'){
+      const verb = game.forcedLoses ? 'lost (no legal cell anywhere)' : 'won by being trapped';
+      detail = '<span class="win-row">'+entry.color+' @ ('+entry.x+','+entry.y+') — forced, '+verb+'. Game over.</span>';
     } else if(entry.pairedWith===null){
       detail = entry.color+' @ ('+entry.x+','+entry.y+') — first stone, no pairing yet.';
     } else {
@@ -802,7 +1092,7 @@ document.getElementById('runBatchBtn').addEventListener('click', async ()=>{
 
   for(let i=0;i<n;i++){
     if(batchAbort) break;
-    const g = newGame(size, freq);
+    const g = newGame(size, freq, forcedLosesRule);
     runFullGame(g, bs, ws);
     if(g.winner==='black') results.black++;
     else if(g.winner==='white') results.white++;
